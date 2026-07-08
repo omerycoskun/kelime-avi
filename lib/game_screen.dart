@@ -4,6 +4,7 @@ import 'ads/ad_banner.dart';
 import 'ads/ad_interstitial.dart';
 import 'ads/ad_rewarded.dart';
 import 'game_state.dart';
+import 'music_service.dart';
 
 const _kbRow1 = ['e', 'r', 't', 'y', 'u', 'ı', 'o', 'p', 'ğ', 'ü'];
 const _kbRow2 = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'ş', 'i'];
@@ -96,6 +97,41 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  Future<void> _openSettings() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setD) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF20233F),
+              title: const Text('Ayarlar',
+                  style: TextStyle(color: Colors.white)),
+              content: SwitchListTile(
+                title: const Text('Müzik',
+                    style: TextStyle(color: Colors.white)),
+                secondary:
+                    const Icon(Icons.music_note, color: Colors.white70),
+                value: MusicService.instance.musicOn,
+                activeThumbColor: const Color(0xFF54B06A),
+                onChanged: (_) async {
+                  await MusicService.instance.toggle();
+                  setD(() {});
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Kapat'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _topBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
@@ -107,25 +143,36 @@ class _GameScreenState extends State<GameScreen> {
             style: const TextStyle(
                 color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFFFC93C)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.monetization_on,
-                    color: Color(0xFFFFC93C), size: 20),
-                const SizedBox(width: 6),
-                Text('${game.coins}',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold)),
-              ],
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: _openSettings,
+                icon: const Icon(Icons.settings, color: Colors.white70),
+                tooltip: 'Ayarlar',
+              ),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFFFC93C)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.monetization_on,
+                        color: Color(0xFFFFC93C), size: 20),
+                    const SizedBox(width: 6),
+                    Text('${game.coins}',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -304,7 +351,19 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _key(String letter, TileState? state) {
-    final bg = state == null ? const Color(0xFF2A2C42) : _tileColor(state);
+    Color bg;
+    Color fg = Colors.white;
+    switch (state) {
+      case TileState.correct:
+        bg = const Color(0xFF54B06A);
+      case TileState.present:
+        bg = const Color(0xFFD3A93E);
+      case TileState.absent:
+        bg = const Color(0xFF191B26); // olmayan harf → solmuş
+        fg = Colors.white24;
+      default:
+        bg = const Color(0xFF2A2C42); // henüz kullanılmadı
+    }
     return Flexible(
       child: Padding(
         padding: const EdgeInsets.all(2),
@@ -314,15 +373,13 @@ class _GameScreenState extends State<GameScreen> {
             height: 48,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: bg == Colors.transparent ? const Color(0xFF2A2C42) : bg,
+              color: bg,
               borderRadius: BorderRadius.circular(7),
             ),
             child: Text(
               letter.toUpperCase(),
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: fg, fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
         ),

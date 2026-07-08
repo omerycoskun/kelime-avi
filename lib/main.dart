@@ -5,6 +5,7 @@ import 'ads/ad_init.dart';
 import 'ads/ad_interstitial.dart';
 import 'ads/ad_rewarded.dart';
 import 'game_screen.dart';
+import 'music_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,7 @@ void main() {
   initAds();
   AdInterstitial.instance.preload();
   AdRewarded.instance.preload();
+  MusicService.instance.init(); // sakin arka plan müziği (await'siz)
   runApp(const KelimeApp());
 }
 
@@ -21,7 +23,7 @@ class KelimeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Kelime Avı',
+      title: 'Kelime Avı Classic',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
