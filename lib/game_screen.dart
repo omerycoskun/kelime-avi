@@ -10,6 +10,21 @@ const _kbRow1 = ['e', 'r', 't', 'y', 'u', 'ı', 'o', 'p', 'ğ', 'ü'];
 const _kbRow2 = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'ş', 'i'];
 const _kbRow3 = ['z', 'c', 'ç', 'v', 'b', 'n', 'm', 'ö'];
 
+/// Türkçe büyük harf: i→İ, ı→I (Dart'ın toUpperCase'i bunu yanlış yapar).
+String trUpper(String s) {
+  final b = StringBuffer();
+  for (final ch in s.split('')) {
+    if (ch == 'i') {
+      b.write('İ');
+    } else if (ch == 'ı') {
+      b.write('I');
+    } else {
+      b.write(ch.toUpperCase());
+    }
+  }
+  return b.toString();
+}
+
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
 
@@ -51,9 +66,15 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
-  void _next() {
-    game.nextLevel();
-    AdInterstitial.instance.notifyGameOver(); // her 2 bölümde geçiş reklamı
+  void _submit() {
+    if (game.current.length == GameState.wordLength && !game.submit()) {
+      _snack('Kelime listede yok');
+    }
+  }
+
+  void _newWord() {
+    game.newWord();
+    AdInterstitial.instance.notifyGameOver(); // her 2 kelimede geçiş reklamı
   }
 
   void _snack(String m) {
@@ -138,10 +159,18 @@ class _GameScreenState extends State<GameScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            'Bölüm ${game.displayLevel}',
-            style: const TextStyle(
-                color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
+          Row(
+            children: [
+              const Icon(Icons.check_circle, color: Color(0xFF54B06A), size: 20),
+              const SizedBox(width: 6),
+              Text(
+                'Çözülen: ${game.solved}',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800),
+              ),
+            ],
           ),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -191,7 +220,7 @@ class _GameScreenState extends State<GameScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 3),
               child: Text(
-                game.revealed.contains(i) ? game.target[i].toUpperCase() : '•',
+                game.revealed.contains(i) ? trUpper(game.target[i]) : '•',
                 style: TextStyle(
                   color: game.revealed.contains(i)
                       ? const Color(0xFFFFC93C)
@@ -208,8 +237,11 @@ class _GameScreenState extends State<GameScreen> {
 
   Widget _grid() {
     return LayoutBuilder(builder: (context, c) {
+      // Hem genişliğe hem yüksekliğe göre sığdır (6 satır + 5 sütun taşmasın).
+      final byW = (c.maxWidth - 36) / GameState.wordLength;
+      final byH = c.maxHeight / GameState.maxGuesses - 12;
       final tile =
-          ((c.maxWidth - 40) / GameState.wordLength).clamp(0.0, 58.0);
+          [byW, byH, 56.0].reduce((a, b) => a < b ? a : b).clamp(20.0, 56.0);
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -234,12 +266,12 @@ class _GameScreenState extends State<GameScreen> {
     TileState state = TileState.empty;
     if (row < game.guesses.length) {
       final g = game.guesses[row];
-      letter = g[col].toUpperCase();
+      letter = trUpper(g[col]);
       state = game.evaluate(g)[col];
     } else if (row == game.guesses.length &&
         game.status == GameStatus.playing) {
       if (col < game.current.length) {
-        letter = game.current[col].toUpperCase();
+        letter = trUpper(game.current[col]);
         state = TileState.filled;
       }
     }
@@ -343,7 +375,7 @@ class _GameScreenState extends State<GameScreen> {
         row(_kbRow2),
         row(
           _kbRow3,
-          leading: _wideKey(Icons.keyboard_return, game.submit, const Color(0xFF4D7CFF)),
+          leading: _wideKey(Icons.keyboard_return, _submit, const Color(0xFF4D7CFF)),
           trailing: _wideKey(Icons.backspace, game.removeLetter, const Color(0xFF3A3A4A)),
         ),
       ],
@@ -377,7 +409,7 @@ class _GameScreenState extends State<GameScreen> {
               borderRadius: BorderRadius.circular(7),
             ),
             child: Text(
-              letter.toUpperCase(),
+              trUpper(letter),
               style: TextStyle(
                   color: fg, fontSize: 18, fontWeight: FontWeight.bold),
             ),
@@ -424,14 +456,14 @@ class _GameScreenState extends State<GameScreen> {
           ),
           if (!won) ...[
             const SizedBox(height: 4),
-            Text('Kelime: ${game.target.toUpperCase()}',
+            Text('Kelime: ${trUpper(game.target)}',
                 style: const TextStyle(color: Colors.white70, fontSize: 16)),
           ],
           const SizedBox(height: 12),
           SizedBox(
             width: 240,
             child: ElevatedButton(
-              onPressed: won ? _next : game.retryLevel,
+              onPressed: _newWord,
               style: ElevatedButton.styleFrom(
                 backgroundColor:
                     won ? const Color(0xFF54B06A) : const Color(0xFF4D7CFF),
@@ -442,7 +474,7 @@ class _GameScreenState extends State<GameScreen> {
                 textStyle:
                     const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
-              child: Text(won ? 'Sonraki Bölüm' : 'Tekrar Dene'),
+              child: Text(won ? 'Sonraki Kelime' : 'Yeni Kelime'),
             ),
           ),
         ],

@@ -1,9 +1,11 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'answers.dart';
 import 'words.dart';
 
-/// Bir harf karesinin durumu (Wordle renkleri).
 enum TileState { empty, filled, correct, present, absent }
 
 enum GameStatus { playing, won, lost }
@@ -11,43 +13,49 @@ enum GameStatus { playing, won, lost }
 class GameState extends ChangeNotifier {
   static const int wordLength = 5;
   static const int maxGuesses = 6;
-  static const int hintCost = 25; // altınla ipucu
-  static const int winReward = 15; // bölüm bitirince altın
+  static const int hintCost = 25;
+  static const int winReward = 15;
   static const int startCoins = 60;
 
-  int level = 0;
   int coins = startCoins;
+  int solved = 0; // toplam çözülen kelime (gösterim + ilerleme)
   final List<String> guesses = [];
   String current = '';
   GameStatus status = GameStatus.playing;
-
-  /// İpucu ile açılan harf pozisyonları (0-tabanlı).
   final Set<int> revealed = {};
+
+  final Random _rng = Random();
+  final Set<String> _dict = kWords.toSet(); // geçerli tahmin sözlüğü (5172)
+  late String _target;
 
   SharedPreferences? _prefs;
   final bool _persist;
 
   // ignore: prefer_initializing_formals
   GameState({bool persist = true}) : _persist = persist {
+    _target = kAnswers[_rng.nextInt(kAnswers.length)];
     if (_persist) _load();
   }
 
-  String get target => kWords[level % kWords.length];
-  int get displayLevel => level + 1;
+  String get target => _target;
+
+  @visibleForTesting
+  void setTargetForTest(String w) => _target = w;
+
   bool get canAffordHint => coins >= hintCost;
   bool get allRevealed => revealed.length >= wordLength;
 
   Future<void> _load() async {
     _prefs = await SharedPreferences.getInstance();
-    level = _prefs?.getInt('level') ?? 0;
     coins = _prefs?.getInt('coins') ?? startCoins;
+    solved = _prefs?.getInt('solved') ?? 0;
     notifyListeners();
   }
 
   void _save() {
     if (!_persist) return;
-    _prefs?.setInt('level', level);
     _prefs?.setInt('coins', coins);
+    _prefs?.setInt('solved', solved);
   }
 
   void addLetter(String l) {
@@ -62,22 +70,28 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void submit() {
-    if (status != GameStatus.playing || current.length != wordLength) return;
+  /// Tahmini gönderir. Geçerli (sözlükte olan) bir kelime değilse kabul edilmez
+  /// ve false döner (anlamsız kelimeler kabul olmaz).
+  bool submit() {
+    if (status != GameStatus.playing || current.length != wordLength) {
+      return false;
+    }
+    if (!_dict.contains(current)) return false;
     guesses.add(current);
     if (current == target) {
       status = GameStatus.won;
       coins += winReward;
+      solved++;
     } else if (guesses.length >= maxGuesses) {
       status = GameStatus.lost;
     }
     current = '';
     _save();
     notifyListeners();
+    return true;
   }
 
-  /// Bir harf ipucu açar. [free] true ise (reklam) bedava; değilse altından
-  /// düşer. Açılacak pozisyon yoksa ya da altın yetmezse false döner.
+  /// Bir harf ipucu açar. [free] true ise (reklam) bedava; değilse altından düşer.
   bool revealHint({required bool free}) {
     if (status != GameStatus.playing || allRevealed) return false;
     if (!free) {
@@ -94,15 +108,9 @@ class GameState extends ChangeNotifier {
     return true;
   }
 
-  void nextLevel() {
-    level++;
-    _resetRound();
-    _save();
-  }
-
-  void retryLevel() => _resetRound();
-
-  void _resetRound() {
+  /// Yeni rastgele kelime (kazanınca "sonraki", kaybedince "yeni kelime").
+  void newWord() {
+    _target = kAnswers[_rng.nextInt(kAnswers.length)];
     guesses.clear();
     current = '';
     revealed.clear();
@@ -110,8 +118,7 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Bir tahminin pozisyon-başına Wordle değerlendirmesi (tekrar eden harfler
-  /// doğru sayılır: önce yeşiller, sonra kalan sayıya göre sarılar).
+  /// Wordle değerlendirmesi (tekrar eden harf doğru: önce yeşil, sonra sarı).
   List<TileState> evaluate(String guess) {
     final result = List<TileState>.filled(wordLength, TileState.absent);
     final counts = <String, int>{};
@@ -136,7 +143,6 @@ class GameState extends ChangeNotifier {
     return result;
   }
 
-  /// Klavye harf renkleri (tüm tahminlerden en iyi durum).
   Map<String, TileState> get keyStates {
     final m = <String, TileState>{};
     for (final g in guesses) {
