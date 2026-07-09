@@ -13,7 +13,7 @@ class AdRewarded {
 
   static String get _unitId => Platform.isAndroid
       ? 'ca-app-pub-3940256099942544/5224354917' // Android test rewarded (Android beklemede)
-      : 'ca-app-pub-3940256099942544/1712485313'; // iOS GERÇEK ödüllü reklam
+      : 'ca-app-pub-1630797078588417/6302399056'; // iOS GERÇEK ödüllü reklam
 
   void preload() => _load();
 
