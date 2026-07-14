@@ -10,11 +10,15 @@ import 'music_service.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  initAds();
-  AdInterstitial.instance.preload();
-  AdRewarded.instance.preload();
   MusicService.instance.init(); // sakin arka plan müziği (await'siz)
   runApp(const KelimeApp());
+  // iOS ATT izin penceresi uygulama AKTİF olduğunda açılabilir. Bu yüzden
+  // ilk kare çizildikten sonra: önce izni iste, sonra reklamları başlat/önyükle.
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await initAds(); // ATT izni + AdMob init
+    AdInterstitial.instance.preload();
+    AdRewarded.instance.preload();
+  });
 }
 
 class KelimeApp extends StatelessWidget {
